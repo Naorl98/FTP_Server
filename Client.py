@@ -17,7 +17,7 @@ global sock, amount, index
 def home():
     con.pack_forget()
     ftpw.pack_forget()
-    first.pack()
+    first.pack(fill='both', expand=1)
 
 
 def connect():
@@ -286,12 +286,16 @@ if __name__ == '__main__':
     root = Tk()
     root.geometry("500x500")
     root.title("Final Proj")
-    first = Frame(root)
-    first.pack()
-    label = tk.Label(first, text="Choose option", font=('Ariel', 20))
+    first = Frame(root, bg='Black')
+    first.pack(fill='both', expand=1)
+    label = tk.Label(first, text="Choose option", fg='Green', bg='Black', font=('Ariel', 20))
     label.pack(padx=10, pady=10)
-    ftp = tk.Button(first, text="FTP", font=('Ariel', 20), command=ftp_client)
+    ftp = tk.Button(first, text="FTP", font=('Ariel', 20), bg='Green', width=40, command=ftp_client)
     ftp.pack(padx=10, pady=30)
+    dns = tk.Button(first, text="DNS", font=('Ariel', 20), bg='Green', width=40, command=ftp_client)
+    dns.pack(padx=10, pady=30)
+    dhcp = tk.Button(first, text="DHCP", font=('Ariel', 20), bg='Green', width=40, command=ftp_client)
+    dhcp.pack(padx=10, pady=30)
     ftpw = Frame(root, bg='Black')
     ftpl = tk.Label(ftpw, text="File Transfer", bg='Black', fg='Green', font=('David', 30))
     ftpl.pack(padx=10, pady=30)
