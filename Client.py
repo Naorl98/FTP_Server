@@ -640,7 +640,7 @@ def domain_to_ip():
         # Convert domain name to UTF-8 bytes
         if check_domain(domain) is False:
             link.delete("1.0", "end")
-            link.insert(INSERT, "Error with this domain name, try again")
+            link.insert(INSERT, "Domain not valid, try again")
             link.pack(padx=10, pady=20)
             print("ERROR WITH THIS DOMAIN NAME, TRY AGAIN")
             return
@@ -651,30 +651,31 @@ def domain_to_ip():
 
         # Response from server
         data, server = sock.recvfrom(BUFF)
-        ip_add = data.decode('utf-8')
-        link.config(text="Ip address -> " + ip_add)
-        link.pack(padx=10, pady=20)
-        print(f"THE IP FOR {domain} is {ip_add}")
+        if data.decode() == "NONE":
+            print("THERE IS NO IP FOR THAT DOMAIN")
+            showdo.config(text="No ip for that domain, try again")
+        else:
+            print("Server send - " + data.decode())
+            link.delete("1.0", "end")
+            showdo.config(text=("Ip address -> " + data.decode()))
     # except socket.gaierror:
     except socket.timeout:
         link.delete("1.0", "end")
-        link.insert(INSERT, "Error with this domain name, try again")
+        link.insert(INSERT, "Time out, try again")
         link.pack(padx=10, pady=20)
-        print("ERROR WITH THIS DOMAIN NAME, TRY AGAIN")
+        print("Time out, TRY AGAIN")
         return
     except socket.error as e:
         print(f"ERROR: {e}")
         link.delete("1.0", "end")
-        link.insert(INSERT, "Error with this domain name, try again")
+        link.insert(INSERT, "Error with socket, try again")
         link.pack(padx=10, pady=20)
-        print("ERROR WITH THIS DOMAIN NAME, TRY AGAIN")
         return
     except Exception as e:
         print(f"ERROR: {e}")
         link.delete("1.0", "end")
         link.insert(INSERT, "Error with this domain name, try again")
         link.pack(padx=10, pady=20)
-        print("ERROR WITH THIS DOMAIN NAME, TRY AGAIN")
         return
 
 
@@ -754,8 +755,7 @@ def got_ack(packet):
 
         # Print the assigned IP address
         print(f"Assigned IP address: {assigned_ip}")
-        link.config(text="Ip address -> " + assigned_ip)
-        link.pack(padx=10, pady=20)
+        showip.config(text="Ip address -> " + assigned_ip)
         # Configure the network interface with the assigned IP address
         conf.iface = "eth0"
         conf.route.add(net="0.0.0.0/0", gw='192.168.1.1')
