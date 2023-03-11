@@ -14,6 +14,7 @@ BUFF = 512  # Buffer size
 ip_port = ("127.0.0.1", 53)
 ip = "127.0.0.1"
 port = 30190
+my_port = 20190
 time_up = 2
 time_down = 8
 packet_maxsize = 1024
@@ -98,6 +99,7 @@ def back_ftp():
 def ftp_client():
     global sock
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    sock.bind((ip, my_port))
     first.pack_forget()
     if connect():
         print("Connect to server")
@@ -417,7 +419,7 @@ def upload():
 def tcp_client():
     global tcpsocket
     tcpsocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-
+    tcpsocket.bind((ip, my_port))
     first.pack_forget()
     try:
         tcpsocket.connect((ip, port))
