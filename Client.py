@@ -34,6 +34,7 @@ def home():
     sock.close()
     dnsw.pack_forget()
     con.pack_forget()
+    ftpw.pack_forget()
     first.pack(fill='both', expand=1)
 
 
@@ -196,14 +197,17 @@ def download():
         names, add = sock.recvfrom(packet_maxsize)
     except socket.timeout:
         print("Time Out")
+        downw.pack_forget()
         home()
         return
     except socket.error as e:
         print("EXIT, socket error - ", e)
+        downw.pack_forget()
         home()
         return
     except Exception as e:
         print(f"EXIT,ERROR: {e}")
+        downw.pack_forget()
         home()
         return
 
@@ -349,6 +353,8 @@ def upload():
         print(f"ERROR: {e}")
         filename.delete("1.0", "end")
         filename.insert(INSERT, "File not found")
+        filename.pack()
+        uplo.configure(state=DISABLED)
         print("File not found")
         return
     print("open file")
@@ -396,6 +402,7 @@ def upload():
                 filename.delete("1.0", "end")
                 filename.insert(INSERT, "Sent half file, continue or stop?")
                 filename.pack()
+                uplo.configure(state=DISABLED)
                 return
 
             data = f.read(packet_maxsize)
@@ -412,8 +419,8 @@ def upload():
                 sock.sendto(seq.encode(), (ip, port))
             index += 1
 
+# rudp client end
 
-# ftp client start
 
 # tcp client start
 def tcp_client():
@@ -497,15 +504,16 @@ def downloadtcp():
         print("Choose file: " + flname)
         tcpsocket.send(flname.encode())
         sizef = int(tcpsocket.recv(1024).decode())
-        downfile = open(flname, 'a')
+        downfile = open(flname, 'w')
         count = 0
         while count < sizef:
             buf = tcpsocket.recv(psize).decode()
+            if buf == "FIN":
+                print("get FIN")
+                break
             count += len(buf)
             downfile.write(buf)
-            if sizef - psize < 0:
-                psize = sizef
-        tcpsocket.send("FIN".encode())
+
         tcp_back()
     except socket.timeout:
         print("Time Out")
@@ -529,7 +537,7 @@ def stoptcp():
 
 
 def upload_2h():
-    global f, curr, tcpsize, tcpsocket
+    global f, tcpsize, tcpsocket
     packet_maxx = packet_maxsize
     stopt.configure(state=DISABLED)
     contit.configure(state=DISABLED)
@@ -538,18 +546,24 @@ def upload_2h():
     filenametcp.pack()
     tcpsocket.send("CON".encode())
     print("Choose to continue")
-    time.sleep(0.02)
-    count = 0
-    while count < tcpsize:
-        s = tcpsocket.sendfile(f, curr, packet_maxx)
-        count += s
-        curr += s
-        if (tcpsize - count) - packet_maxx < 0:
-            packet_maxx = tcpsize - count
+    while tcpsize > 0:
+        pac = f.read(packet_maxx)
+        if len(pac) == 0:
+            tcpsocket.send("FIN".encode())
+            print("Send FIN")
+            tcpsize = 0
+        else:
+            s = tcpsocket.send(pac.encode())
+            time.sleep(0.01)
+            tcpsize -= s
+        if packet_maxx > tcpsize:
+            packet_maxx = tcpsize
+
     print("File sent")
-    filename.delete("1.0", "end")
-    filename.insert(INSERT, "File upload")
-    uplo.configure(state=DISABLED)
+    filenametcp.delete("1.0", "end")
+    filenametcp.insert(INSERT, "File upload")
+    filenametcp.pack()
+    uplotcp.configure(state=DISABLED)
     tcpmsg = tcpsocket.recv(packet_maxsize).decode()
     if tcpmsg == "ACK_ALL":
         print("Get ACK_ALL")
@@ -558,15 +572,17 @@ def upload_2h():
 
 
 def upload_t():
-    global f, curr, tcpsize, tcpsocket
+    global f, tcpsize, tcpsocket
     print("in upload")
     file_name2 = (filenametcp.get('1.0', tk.END))[:-1] + ".txt"
     try:
-        f = open(file_name2, 'br')
+        f = open(file_name2, 'r')
     except Exception as e:
         print(f"ERROR: {e}")
-        filename.delete("1.0", "end")
-        filename.insert(INSERT, "File not found")
+        filenametcp.delete("1.0", "end")
+        filenametcp.insert(INSERT, "File not found")
+        filenametcp.pack()
+        uplotcp.configure(state=DISABLED)
         print("File not found")
         tcp_back()
         return
@@ -577,10 +593,9 @@ def upload_t():
         tcpsocket.send(file_name2.encode())
         server_msg = tcpsocket.recv(packet_maxsize)
         if server_msg.decode() == 'ERR1':
-            filename.delete("1.0", "end")
-            filename.insert(INSERT, "File exist, choose another name")
+            filenametcp.delete("1.0", "end")
+            filenametcp.insert(INSERT, "File exist, choose another name")
             uplotcp.configure(state=DISABLED)
-            tcp_back()
             return
         file_stats = os.stat(file_name2)
         size = file_stats.st_size
@@ -590,27 +605,27 @@ def upload_t():
             tcp_home()
             return
         count = 0
-        offset = 0
         halfsize = size - int(size / 2)
-        packet_max = packet_maxsize
-        while count < halfsize:
-            s = tcpsocket.sendfile(f, offset, packet_max)
-            count += s
-            if (halfsize - count) - packet_max < 0:
-                packet_max = (halfsize - count)
         tcpsize = size - halfsize
-        curr = count
+        packet_max = packet_maxsize
+        while halfsize > 0:
+            pac = f.read(packet_max)
+            tcpsocket.send(pac.encode())
+            halfsize -= packet_max
+            if packet_max > halfsize:
+                packet_max = halfsize
         stopt.configure(state=NORMAL)
         contit.configure(state=NORMAL)
         tcpsocket.settimeout(None)
         print("Sent half file")
-        tcpsocket.send("STOP".encode())
+        tcpmsg = tcpsocket.recv(packet_maxsize).decode()
+        if tcpmsg == "OK":
+            print("Server got STOP")
         filenametcp.delete("1.0", "end")
         filenametcp.insert(INSERT, "Sent half file, continue or stop?")
         filenametcp.pack()
-        msg = tcpsocket.recv(packet_max)
-        if msg[:3].decode() == "FIN":
-            return
+
+
     except socket.timeout:
         print("Time Out")
         return
@@ -653,11 +668,15 @@ def domain_to_ip():
         data, server = sock.recvfrom(BUFF)
         if data.decode() == "NONE":
             print("THERE IS NO IP FOR THAT DOMAIN")
-            showdo.config(text="No ip for that domain, try again")
+            link.delete("1.0", "end")
+            link.insert(INSERT, "Domain not valid, try again")
+            link.pack(padx=10, pady=20)
+            return
         else:
             print("Server send - " + data.decode())
             link.delete("1.0", "end")
             showdo.config(text=("Ip address -> " + data.decode()))
+
     # except socket.gaierror:
     except socket.timeout:
         link.delete("1.0", "end")
@@ -787,14 +806,14 @@ if __name__ == '__main__':
     label = tk.Label(first, text="Choose option", fg='Green', bg='Black', font=('Ariel', 20))
     label.pack(padx=10, pady=10)
     ftp = tk.Button(first, text="FTP", font=('Ariel', 20), bg='Green', width=40, command=ftp_client)
-    ftp.pack(padx=10, pady=30)
+    ftp.pack(padx=10, pady=20)
     tcp = tk.Button(first, text="TCP", font=('Ariel', 20), bg='Green', width=40, command=tcp_client)
-    tcp.pack(padx=10, pady=30)
+    tcp.pack(padx=10, pady=20)
     dns = tk.Button(first, text="DNS", font=('Ariel', 20), bg='Green', width=40, command=dns_client)
-    dns.pack(padx=10, pady=30)
+    dns.pack(padx=10, pady=20)
     dhcp = tk.Button(first, text="DHCP", font=('Ariel', 20), bg='Green', width=40, command=showdhcp)
-    dhcp.pack(padx=10, pady=30)
-    close = tk.Button(first, text="exit", font=('Ariel', 10), bg='Red', width=5, command=closes)
+    dhcp.pack(padx=10, pady=10)
+    close = tk.Button(first, text="exit", font=('Ariel', 20), bg='Red', width=10, command=closes)
     close.pack(padx=10, pady=20)
     # first finish
 
@@ -859,7 +878,7 @@ if __name__ == '__main__':
     downl.pack()
     scrollbar = Scrollbar(downw)
     scrollbar.pack(side=RIGHT, fill=Y)
-    mylist = Listbox(downw, width=60, bg='Black', fg='Green', yscrollcommand=scrollbar.set)
+    mylist = Listbox(downw, width=40, bg='Black', font=('Ariel', 15), fg='Green', yscrollcommand=scrollbar.set)
     cho = tk.Button(downw, text="Enter", font=('Ariel', 20), bg='Green', width=30, command=cfile)
     cho.place(x=50, y=150)
     cho.pack(padx=10, pady=10)
