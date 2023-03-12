@@ -175,6 +175,7 @@ def upload(server_socket, address):
     buffer = []
     index_packet = []
     resp = []
+    ibud = 0
     count = 0
     pcount = 0
     filename = ""
@@ -254,6 +255,7 @@ def upload(server_socket, address):
                             lost.append(i)
                     for j in range(len(lost)):
                         server_socket.sendto(("ERR2" + str(lost[j])).encode(), address)
+                        print("Req packer numer: " + str(lost[j]))
                         data = recivepac(server_socket, address, )
                         buffer.append(data.decode())
                         seq_packet = seq_packet + 1
@@ -261,17 +263,22 @@ def upload(server_socket, address):
                             changed = True
                         index_packet.append(lost[j])
             else:
+
                 info = data.decode()
                 data = recivepac(server_socket, address)
-                if data[:1].decode() == "L" or data[:1].decode() == "P":
-                    buffer.append(info)
-                    seq_packet = seq_packet + 1
-                    num = int(data[1:].decode())
-                    if index_packet and num < index_packet[-1]:
-                        changed = True
-                    index_packet.append(num)
-                    if data[:1].decode() == "L":
-                        larrived = True
+                if ibud != 3:
+                    if data[:1].decode() == "L" or data[:1].decode() == "P":
+                        buffer.append(info)
+                        seq_packet = seq_packet + 1
+                        ibud += 1
+                        num = int(data[1:].decode())
+                        if index_packet and num < index_packet[-1]:
+                            changed = True
+                        index_packet.append(num)
+                        if data[:1].decode() == "L":
+                            larrived = True
+                else:
+                    ibud +=1
         except socket.timeout:
             print("Time Out")
             seq_packet = 0
@@ -295,22 +302,22 @@ def upload(server_socket, address):
 
 def ftpmenu(server, client):
     while True:
-        server.settimeout(5)
+        server.settimeout(8)
         try:
             menu_msg = recivepac(server, client)
             if menu_msg[:2].decode() == "UP":
                 server.sendto("ACK".encode(), c_add)
                 print("send ACK")
+                server.settimeout(None)
                 upload(server, c_add)
-                menu_msg = ""
             elif menu_msg[:2].decode() == "DO":
                 print("get DO")
+                server.settimeout(None)
                 allfiles = getall()
                 allfiles = "ACK" + allfiles
                 server.sendto(allfiles.encode(), c_add)
                 print("send ACK and files list")
                 download(server, c_add)
-                menu_msg = ""
             elif menu_msg[:2].decode() == "FN":
                 print("Client " + str(client) + " leave the server")
                 return
@@ -330,13 +337,13 @@ if __name__ == '__main__':
     server = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     server.bind((ip, port))
     print("Server is ready")
+    if not ifExist("files.txt"):
+        names = open(files_names, 'a')
+        names.write("files.txt\n")
+        names.close()
     server.settimeout(None)
     while True:
         try:
-            if not ifExist("files.txt"):
-                names = open(files_names, 'a')
-                names.write("files.txt\n")
-                names.close()
             if not client_wait:
                 msg, c_add = server.recvfrom(packet_maxsize)
                 if msg[:3].decode() == "NEW":
