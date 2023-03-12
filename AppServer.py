@@ -42,22 +42,27 @@ def ifExist(name):
 
 def download(cs):
     print("In download")
-    global packet_max
     try:
         name = cs.recv(1024)
         filename = name.decode()
-        f = open("files\\" + filename, 'br')
+        f = open("files\\" + filename, 'r')
         file_stats = os.stat("files\\" + filename)
         size = file_stats.st_size
         print("Send file: " + filename + ", size = " + str(size))
         cs.send(str(size).encode())
-        count = 0
-        offset = 0
-        while count < size:
-            s = cs.sendfile(f, offset, packet_max)
-            count += s
-            if (size - count) - packet_max < 0:
-                packet_max = size - count
+        pac_size = packet_max
+        while size > 0:
+            pac = f.read(packet_max)
+            if len(pac) == 0:
+                size = 0
+                print("send FIN")
+                cs.send("FIN".encode())
+            else:
+                s = cs.send(pac.encode())
+                size -= s
+                time.sleep(0.01)
+            if pac_size > size:
+                pac_size = size
         msg = cs.recv(packet_max)
         if msg[:3].decode() == "FIN":
             print("Finish - file sent and received")
@@ -86,30 +91,32 @@ def upload(csocket):
         else:
             print("Send OK")
             csocket.send("OK".encode())
-        f = open("files\\" + filename, 'w')
+        f = open("files\\" + filename, 'a')
         files = open(files_names, 'a')
         files.write(filename + "\n")
         files.close()
         size = int(csocket.recv(1024).decode())
         csocket.send("OK".encode())
-
+        halfsize = True
         count = 0
         while count < size:
-            buf = csocket.recv(packet_max).decode()
-            if buf.encode() == "STOP":
-                time.sleep(0.02)
+            if halfsize and count == size - int(size / 2):
+                csocket.send("OK".encode())
+                print("Send ok half size")
+                halfsize = False
                 buf = csocket.recv(packet_max).decode()
                 if buf == "BYE":
                     print("Client choose to stop")
                     return
                 if buf == "CON":
                     print("Client choose to continue")
-                    continue
             else:
+                buf = csocket.recv(packet_max).decode()
+                if buf == "FIN":
+                    print("get FIN")
+                    break
                 count += len(buf)
                 f.write(buf)
-                if (size - count) - packet_max < 0:
-                    packet_max = size - count
         print("Receive file, send ack all")
         csocket.send("ACK_ALL".encode())
         return
