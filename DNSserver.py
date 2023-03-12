@@ -43,12 +43,15 @@ def dns_server(ip, port):
             ip_add = recv_ip(domain)
             if ip_add is None:
                 print(f"THERE IS NO IP FOR THAT DOMAIN!! {domain}")
-                continue
-            print("SENDING IP ADDRESS")
-            sock.sendto(ip_add.encode(), addr)
-            domain_ip.append((domain, ip_add))      # adds the domain,ip as tuple to the list since its been searched
+                sock.sendto("NONE".encode(), addr)
+            else:
+                print("SENDING IP ADDRESS")
+                sock.sendto(ip_add.encode(), addr)
+                domain_ip.append((domain, ip_add))
+                # adds the domain,ip as tuple to the list since its been searched
         else:
-            print("SENDING IP ADDRESS FROM CACHE")      # domain's ip has been searched before and stored in the list
+            print("SENDING IP ADDRESS FROM CACHE")
+            # domain's ip has been searched before and stored in the list
             sock.sendto(ip_add.encode(), addr)
 
 
